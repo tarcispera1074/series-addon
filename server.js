@@ -117,7 +117,6 @@ async function unrestrictWithRealDebrid(hosterUrl) {
 
 async function fetchStream(movieUrl) {
   try {
-    // 1. Fully decode URL
     let cleanUrl = movieUrl.replace(/^custom:/, "");
     while (cleanUrl.includes("%3A") || cleanUrl.includes("%2F") || cleanUrl.includes("%2f")) {
       cleanUrl = decodeURIComponent(cleanUrl);
@@ -125,7 +124,6 @@ async function fetchStream(movieUrl) {
 
     console.log("[DETAIL PAGE]", cleanUrl);
 
-    // 2. Fetch page HTML
     const res = await fetch(cleanUrl, {
       headers: {
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -133,17 +131,16 @@ async function fetchStream(movieUrl) {
     });
     const html = await res.text();
 
-    // 3. Search for any video player embeds, iframes, sources, and video hosters
+    // 🔍 Print the exact player container tags found on the page
+    const playerTags = html.match(/<(?:iframe|video|embed|div|button|a)[^>]+(?:player|video|embed|stream|source|ajax|data-)[^>]*>/gi) || [];
+    console.log("[PLAYER TAGS FOUND]", playerTags.slice(0, 10));
+
+    // Search across all stream patterns
     const streamPatterns = [
-      // Direct m3u8 or mp4
       /https?:\/\/[^\s"'<>]+\.(?:m3u8|mp4)(?:\?[^\s"'<>]*)?/i,
-      // Video Hosters (Filemoon, Streamtape, Doodstream, Vidhide, Mixdrop, Streamwish, Streamruby, etc.)
       /https?:\/\/(?:filemoon|streamtape|dood|vidhide|streamwish|mixdrop|streamruby|voe|streamcloud|waaw|vidoza|luluvdo|supervideo|dropload)[^\s"'<>]+/i,
-      // Iframes with http or //
-      /<iframe[^>]+(?:src|data-src|data-url)=["']((?:https?:)?\/\/[^"']+)["']/i,
-      // Source & video tags
+      /<iframe[^>]+(?:src|data-src|data-url|data-lazy-src)=["']((?:https?:)?\/\/[^"']+)["']/i,
       /<source[^>]+src=["']((?:https?:)?\/\/[^"']+)["']/i,
-      // JS Player configurations
       /(?:file|source|url|src|video_url)\s*:\s*["']((?:https?:)?\/\/[^"']+)["']/i
     ];
 
@@ -152,22 +149,17 @@ async function fetchStream(movieUrl) {
       const match = html.match(pattern);
       if (match) {
         foundVideoUrl = match[1] || match[0];
-        // Fix protocol-relative URLs starting with "//"
-        if (foundVideoUrl.startsWith("//")) {
-          foundVideoUrl = "https:" + foundVideoUrl;
-        }
+        if (foundVideoUrl.startsWith("//")) foundVideoUrl = "https:" + foundVideoUrl;
         break;
       }
     }
 
     if (!foundVideoUrl) {
-      console.log("[NO STREAM PATTERN MATCHED ON PAGE]");
+      console.log("[NO STREAM PATTERN MATCHED]");
       return [];
     }
 
     console.log("[FOUND VIDEO URL]", foundVideoUrl);
-
-    // 4. Unrestrict link through Real-Debrid
     const fastStreamUrl = await unrestrictWithRealDebrid(foundVideoUrl);
     console.log("[FINAL PLAYABLE STREAM]", fastStreamUrl);
 
