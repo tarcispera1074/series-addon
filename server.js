@@ -117,10 +117,13 @@ async function unrestrictWithRealDebrid(hosterUrl) {
 
 async function fetchStream(movieUrl) {
   try {
-    // 1. Strip the "custom:" prefix from the URL
-    const cleanUrl = movieUrl.replace(/^custom:/, "");
+    // 1. Clean and fully decode URL
+    let cleanUrl = decodeURIComponent(movieUrl).replace(/^custom:/, "");
+    if (!cleanUrl.startsWith("http")) {
+      cleanUrl = decodeURIComponent(cleanUrl);
+    }
 
-    // 2. Fetch the movie page
+    // 2. Fetch the movie page HTML
     const res = await fetch(cleanUrl, {
       headers: {
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -128,28 +131,43 @@ async function fetchStream(movieUrl) {
     });
     const html = await res.text();
 
-    // 3. Extract direct stream URL or iframe embed
-    const streamMatch = html.match(/https?:\/\/[^\s"'<>]+\.(?:m3u8|mp4)/i) 
-      || html.match(/<iframe[^>]+src=["'](https?:\/\/[^"']+)["']/i);
+    // 3. Search for video sources across all formats (m3u8, mp4, iframe data-src, source tags, player configs)
+    const streamPatterns = [
+      /https?:\/\/[^\s"'<>]+\.(?:m3u8|mp4)/i,
+      /<iframe[^>]+(?:src|data-src)=["'](https?:\/\/[^"']+)["']/i,
+      /<source[^>]+src=["'](https?:\/\/[^"']+)["']/i,
+      /(?:file|source|src)\s*:\s*["'](https?:\/\/[^"']+)["']/i
+    ];
 
-    const rawVideoUrl = streamMatch ? (streamMatch[1] || streamMatch[0]) : "";
-
-    if (!rawVideoUrl) {
-      console.log("No stream link found on page:", cleanUrl);
-      return [];
+    let rawVideoUrl = "";
+    for (const pattern of streamPatterns) {
+      const match = html.match(pattern);
+      if (match) {
+        rawVideoUrl = match[1] || match[0];
+        break;
+      }
     }
 
-    // 4. Unrestrict through Real-Debrid
+    // Fallback: If no direct embed pattern matches, use page URL
+    if (!rawVideoUrl) {
+      rawVideoUrl = cleanUrl;
+    }
+
+    // 4. Unrestrict link through Real-Debrid
     const fastStreamUrl = await unrestrictWithRealDebrid(rawVideoUrl);
 
     return [
       {
-        title: "⚡ Real-Debrid 1080p Stream",
+        title: "⚡ Real-Debrid Fast Stream (1080p)",
         url: fastStreamUrl
+      },
+      {
+        title: "🌐 Direct Source Stream",
+        url: rawVideoUrl
       }
     ];
   } catch (err) {
-    console.error("Stream Error:", err);
+    console.error("Stream extraction error:", err);
     return [];
   }
 }
