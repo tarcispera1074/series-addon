@@ -126,10 +126,18 @@ async function fetchStream(movieUrl) {
 
     const res = await fetch(cleanUrl, {
       headers: {
-        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "accept-language": "en-US,en;q=0.5",
+        "sec-fetch-dest": "document",
+        "sec-fetch-mode": "navigate",
+        "sec-fetch-site": "none"
       }
     });
     const html = await res.text();
+
+    console.log("[HTTP STATUS]", res.status, "HTML LENGTH:", html.length);
+    console.log("[HTML PREVIEW]", html.substring(0, 300).replace(/\n/g, " "));
 
     // 🔍 Print the exact player container tags found on the page
     const playerTags = html.match(/<(?:iframe|video|embed|div|button|a)[^>]+(?:player|video|embed|stream|source|ajax|data-)[^>]*>/gi) || [];
