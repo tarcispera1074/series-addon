@@ -31,7 +31,7 @@ const manifest = {
   name: "Pornx 11",                       // Addon name shown in Nuvio
   description: "Streams movies from target site",
   logo: "https://pornx11.com/wp-content/uploads/2023/10/Ponx11-Logo.png",    // Addon icon URL
-  resources: ["catalog", "stream"],
+    resources: ["catalog", "meta", "stream"],
   types: ["movie"],
   idPrefixes: ["custom:"],
   catalogs: [
@@ -158,6 +158,23 @@ http.createServer(async (req, res) => {
     }
     const metas = await fetchCatalog(query);
     return sendJson(res, 200, { metas });
+  }
+
+    // Meta Handler (Opens the movie details screen in Nuvio)
+  if (path.startsWith("/meta/")) {
+    const match = path.match(/\/meta\/movie\/(.+)\.json$/);
+    const id = match ? decodeURIComponent(match[1]) : "";
+    const rawName = id.replace(/^custom:/, "").replace(/https?:\/\/[^\/]+\//, "").replace(/\/$/, "").replace(/-/g, " ");
+    const cleanName = rawName.charAt(0).toUpperCase() + rawName.slice(1);
+
+    return sendJson(res, 200, {
+      meta: {
+        id: id,
+        type: "movie",
+        name: cleanName,
+        description: "Ready to stream via Real-Debrid"
+      }
+    });
   }
 
   // Stream Handler
