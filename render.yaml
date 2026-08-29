@@ -1,0 +1,5 @@
+services:
+  - type: web
+    name: custom-stremio-addon
+    runtime: docker
+    healthCheckPath: /manifest.json
