@@ -117,13 +117,30 @@ async function unrestrictWithRealDebrid(hosterUrl) {
 
 async function fetchStream(movieUrl) {
   try {
-    const res = await fetch(movieUrl, { headers: { "user-agent": "Mozilla/5.0" } });
-    const html = await res.text();
-    const streamMatch = html.match(/https?:\/\/[^\s"']+\.m3u8/);
-    const videoUrl = streamMatch ? streamMatch[0] : "";
+    // 1. Strip the "custom:" prefix from the URL
+    const cleanUrl = movieUrl.replace(/^custom:/, "");
 
-    // ⚡ Unrestrict with Real-Debrid
-    const fastStreamUrl = await unrestrictWithRealDebrid(videoUrl);
+    // 2. Fetch the movie page
+    const res = await fetch(cleanUrl, {
+      headers: {
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      }
+    });
+    const html = await res.text();
+
+    // 3. Extract direct stream URL or iframe embed
+    const streamMatch = html.match(/https?:\/\/[^\s"'<>]+\.(?:m3u8|mp4)/i) 
+      || html.match(/<iframe[^>]+src=["'](https?:\/\/[^"']+)["']/i);
+
+    const rawVideoUrl = streamMatch ? (streamMatch[1] || streamMatch[0]) : "";
+
+    if (!rawVideoUrl) {
+      console.log("No stream link found on page:", cleanUrl);
+      return [];
+    }
+
+    // 4. Unrestrict through Real-Debrid
+    const fastStreamUrl = await unrestrictWithRealDebrid(rawVideoUrl);
 
     return [
       {
