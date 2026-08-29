@@ -117,13 +117,15 @@ async function unrestrictWithRealDebrid(hosterUrl) {
 
 async function fetchStream(movieUrl) {
   try {
-    // 1. Clean and fully decode URL
-    let cleanUrl = decodeURIComponent(movieUrl).replace(/^custom:/, "");
-    if (!cleanUrl.startsWith("http")) {
+    // 1. Fully decode URL so no %3A or %2F remains
+    let cleanUrl = movieUrl.replace(/^custom:/, "");
+    while (cleanUrl.includes("%3A") || cleanUrl.includes("%2F") || cleanUrl.includes("%2f")) {
       cleanUrl = decodeURIComponent(cleanUrl);
     }
 
-    // 2. Fetch the movie page HTML
+    console.log("Fetching detail page:", cleanUrl);
+
+    // 2. Fetch page HTML
     const res = await fetch(cleanUrl, {
       headers: {
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -131,39 +133,37 @@ async function fetchStream(movieUrl) {
     });
     const html = await res.text();
 
-    // 3. Search for video sources across all formats (m3u8, mp4, iframe data-src, source tags, player configs)
+    // 3. Search for direct video streams and video hosters
     const streamPatterns = [
-      /https?:\/\/[^\s"'<>]+\.(?:m3u8|mp4)/i,
+      /https?:\/\/[^\s"'<>]+\.(?:m3u8|mp4)(?:\?[^\s"'<>]*)?/i,
+      /https?:\/\/(?:filemoon|streamtape|dood|vidhide|streamwish|mixdrop|streamruby|voe|streamcloud|waaw|vidoza|luluvdo|supervideo)[^\s"'<>]+/i,
       /<iframe[^>]+(?:src|data-src)=["'](https?:\/\/[^"']+)["']/i,
-      /<source[^>]+src=["'](https?:\/\/[^"']+)["']/i,
-      /(?:file|source|src)\s*:\s*["'](https?:\/\/[^"']+)["']/i
+      /(?:file|source|url|src)\s*:\s*["'](https?:\/\/[^"']+)["']/i
     ];
 
-    let rawVideoUrl = "";
+    let foundVideoUrl = "";
     for (const pattern of streamPatterns) {
       const match = html.match(pattern);
       if (match) {
-        rawVideoUrl = match[1] || match[0];
+        foundVideoUrl = match[1] || match[0];
         break;
       }
     }
 
-    // Fallback: If no direct embed pattern matches, use page URL
-    if (!rawVideoUrl) {
-      rawVideoUrl = cleanUrl;
+    if (!foundVideoUrl) {
+      console.log("No video stream found on page:", cleanUrl);
+      return [];
     }
 
+    console.log("Found video source:", foundVideoUrl);
+
     // 4. Unrestrict link through Real-Debrid
-    const fastStreamUrl = await unrestrictWithRealDebrid(rawVideoUrl);
+    const fastStreamUrl = await unrestrictWithRealDebrid(foundVideoUrl);
 
     return [
       {
-        title: "⚡ Real-Debrid Fast Stream (1080p)",
+        title: "⚡ Real-Debrid 1080p Stream",
         url: fastStreamUrl
-      },
-      {
-        title: "🌐 Direct Source Stream",
-        url: rawVideoUrl
       }
     ];
   } catch (err) {
